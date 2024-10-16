@@ -76,7 +76,7 @@ CREATE TABLE Games (
     esrbRating NVARCHAR(255),
     CONSTRAINT Games_PK PRIMARY KEY (mediaId),
     CONSTRAINT Games_FK FOREIGN KEY (mediaId) REFERENCES Media(mediaId),
-    CONSTRAINT Games_esrb_rating_check CHECK ([esrbRating] IN ('Mature', 'Everyone 10+', 'Not Rated', 'Teen'))
+    CONSTRAINT Games_esrb_rating_check CHECK ([esrbRating] IN ('Mature', 'Everyone 10+', 'Everyone', 'Not Rated', 'Teen'))
 );
 
 CREATE TABLE Tv (
@@ -503,14 +503,14 @@ INSERT INTO Games VALUES(51, 'Capcom', 'PC', 89.0, 'Teen');
 INSERT INTO Games VALUES(52, 'Supergiant Games', 'PC', 93.0, 'Teen');
 INSERT INTO Games VALUES(53, 'Team Cherry', 'PC', 88.0, 'Everyone 10+');
 INSERT INTO Games VALUES(54, 'Deep Silver', 'PlayStation 4', 93.0, 'Mature');
-INSERT INTO Games VALUES(55, 'Psyonix', 'PC', 86.0, 'Everyone 10+');
+INSERT INTO Games VALUES(55, 'Psyonix', 'PC', 86.0, 'Everyone');
 INSERT INTO Games VALUES(56, '505 Games', 'PC', 81.0, 'Teen');
 INSERT INTO Games VALUES(57, 'Bandai Namco Entertainment', 'PC', 0, 'Mature');
 INSERT INTO Games VALUES(58, 'Electronic Arts', 'PC', 94.0, 'Mature');
 INSERT INTO Games VALUES(59, 'Activision Blizzard', 'PC', 91.0, 'Teen');
 INSERT INTO Games VALUES(60, 'Nintendo', 'Nintendo Switch', 97.0, 'Everyone 10+');
 INSERT INTO Games VALUES(61, 'Bandai Namco Entertainment', 'PC', 89.0, 'Mature');
-INSERT INTO Games VALUES(62, 'Nintendo', 'Nintendo Switch', 90.0, 'Everyone 10+');
+INSERT INTO Games VALUES(62, 'Nintendo', 'Nintendo Switch', 90.0, 'Everyone');
 INSERT INTO Games VALUES(63, 'CD PROJEKT RED', 'PC', 92.0, 'Mature');
 INSERT INTO Games VALUES(64, 'Sony Computer Entertainment', 'PlayStation 5', 93.0, 'Teen');
 INSERT INTO Games VALUES(65, 'Larian Studios', 'PC', 95.0, 'Mature');
