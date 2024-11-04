@@ -5,7 +5,7 @@ GO
 -- encryption for security purposes
 -- Note: Modify passwordHash to VARBINARY(256) in [user] table
 
--- Create Certificate and Key
+-- Create Certificate and Symmetric Key
 CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'Media_Organizer_App@2024!';
 
 CREATE CERTIFICATE UserCert 
@@ -154,14 +154,78 @@ GO
 -- 2. Create 3 functions :- For your project create three functions and emphasize how or why they
 -- would be used
 
+-- This function will be used to fetch the full name of a user given their user id
+-- It will be useful for displaying the user's name on the dashboard once they logon
+
+CREATE FUNCTION dbo.getFullName (
+        @UserId INT
+    )
+    RETURNS NVARCHAR(510)
+    AS
+    BEGIN
+        DECLARE @FullName NVARCHAR(510);
+
+        SELECT @FullName = firstName + ' ' + lastName
+        FROM [user]
+        WHERE id = @UserId;
+
+        RETURN @FullName;
+    END;
+GO
+
+SELECT dbo.getFullName(1) AS FullName;
+GO
+
+-- This function will be used to find the average ratings of media that have gotten user reviews.
+-- It was be used to display an aggregate rating for a media item on the details page of the website.
+
+CREATE FUNCTION dbo.averageRating (
+        @mediaName NVARCHAR(255)
+    )
+    RETURNS DECIMAL(6, 2)
+    AS
+    BEGIN
+        DECLARE @AvgRating DECIMAL(6, 2);
+
+        SELECT @AvgRating = AVG(CAST(r.rating AS DECIMAL(6, 2)))
+        FROM Media m
+        JOIN Review_for rf ON m.mediaId = rf.mediaId
+        JOIN Review r ON rf.reviewId = r.reviewId
+        GROUP BY m.mediaId, m.[name]
+        HAVING m.[name] = @mediaName;
+
+        RETURN @AvgRating;
+
+    END;
+GO
+
+SELECT dbo.averageRating('Dunkirk') AS AvgRating;
+GO
+
+-- This table-valued function will be used to find the most common genres of the media added to a specific collection
+-- (identified) by a collection id. This will help us determine the over themes of a particular collection
+-- in our app. We plan to use this to display the most common genres for a collection created by a user.
+
+CREATE FUNCTION dbo.getCollectionGenreCounts (
+        @collectionId INT
+    )
+    RETURNS TABLE
+    AS
+    RETURN
+    (
+        SELECT m.genre, COUNT(*) AS genre_count
+        FROM [Collection_Contains_Media] ccm
+        JOIN Media m ON m.mediaId = ccm.mediaId
+        WHERE ccm.collectionId = @collectionId
+        GROUP BY m.genre
+    );
+GO
+
+SELECT * FROM dbo.getCollectionGenreCounts(3);
 
 -- 3. Create 3 views :- For your project create three views for any 3 tables
 
-
 -- 4. Create 1 Trigger :- For your project create one Trigger associated with any type of action
 -- between the referenced tables(primary-foreign key relationship tables)
-
-
-
 
 -- 6. Create 3 non-clustered indexes :- create 3 non-clustered indexes on your tables.
