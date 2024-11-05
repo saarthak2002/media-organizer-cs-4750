@@ -225,7 +225,105 @@ SELECT * FROM dbo.getCollectionGenreCounts(3);
 
 -- 3. Create 3 views :- For your project create three views for any 3 tables
 
+-- Displays all media stored in our database with their unique properties
+
+CREATE VIEW vw_Media AS
+SELECT
+    Media.[name],
+    Media.overview,
+    Media.release_date,
+    Media.genre,
+    Media.[type],
+    Movie.rating,
+    Movie.leadActor,
+    Movie.leadActorCharacter,
+    Movie.supportingActor,
+    Movie.supportingActorCharacter,
+    Movie.director,
+    Games.publisher,
+    Games.platform,
+    Games.metacritic,
+    Games.esrbRating,
+    Tv.[language],
+    Tv.rating,
+    Tv.numberOfEpisodes,
+    Tv.numberOfSeasons,
+    Tv.[status],
+    Tv.network,
+    Music.artist,
+    Music.songDuration,
+    Music.producer,
+    Music.recordLabel,
+    Books.publisher,
+    Books.author,
+    Books.maturity_rating,
+    Books.page_count,
+    Books.isbn
+FROM Media
+JOIN Books ON Books.mediaId = Media.mediaId
+JOIN Music ON Music.mediaId = Media.mediaId
+JOIN Tv ON Tv.mediaId = Media.mediaId
+JOIN Games ON Games.mediaId = Media.mediaId
+JOIN Movies ON Media.mediaId = Movies.mediaId
+GO
+
+-- Shows user reviews grouped by user
+
+CREATE VIEW vw_UserReviews AS
+SELECT
+    [user].email,
+    [user].firstName,
+    [user].lastName,
+    Review.mediaId,
+    Review.rating,
+    Review.reviewTitle,
+    Review.reviewText,
+    Review_for.reviewedAt
+FROM [user]
+JOIN Review_for ON [user].id = Review_for.userId
+JOIN Review ON Review_for.reviewId = Review.reviewId
+GROUP BY [user].id
+GO
+
+-- Shows user collections grouped by user
+CREATE VIEW vw_UserCollections AS
+SELECT
+    [user].email,
+    [user].firstName,
+    [user].lastName,
+    [User_Creates_Collection].dateCreated,
+    [Collection_tag].tag,
+    [Collection].collectionName,
+    [Collection].collectionDesc
+FROM[user]
+JOIN [User_Creates_Collection] ON [User_Creates_Collection].userId = [user].id
+JOIN [Collection] ON [Collection].collectionId = [User_Creates_Collection].collectionId
+GO
+
 -- 4. Create 1 Trigger :- For your project create one Trigger associated with any type of action
 -- between the referenced tables(primary-foreign key relationship tables)
 
+CREATE TRIGGER trg_UserActionHistory
+ON Review_for
+INSTEAD OF INSERT
+AS 
+BEGIN
+    DECLARE @id INT;
+
+    SELECT @id FROM [user];
+
+    IF EXISTS(
+        SELECT 1 FROM [user] WHERE id = @id
+    )
+    BEGIN
+        RAISERROR('This user has already written a review', 16, 1);
+    END
+END;
+
 -- 6. Create 3 non-clustered indexes :- create 3 non-clustered indexes on your tables.
+
+CREATE NONCLUSTERED INDEX idx_MediaIdForReview on Review(mediaId);
+
+CREATE NONCLUSTERED INDEX idx_MediaIdForCollecion on [Collection_contains_Media](mediaId);
+
+CREATE NONCLUSTERED INDEX idx_UsersCollections on [User_Creates_Collection](userId);
