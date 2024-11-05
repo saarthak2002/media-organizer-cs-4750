@@ -227,6 +227,8 @@ SELECT * FROM dbo.getCollectionGenreCounts(3);
 
 -- Displays all media stored in our database with their unique properties
 
+-- Displays all media stored in our database with their unique properties
+
 CREATE VIEW vw_Media AS
 SELECT
     Media.[name],
@@ -234,18 +236,18 @@ SELECT
     Media.release_date,
     Media.genre,
     Media.[type],
-    Movie.rating,
-    Movie.leadActor,
-    Movie.leadActorCharacter,
-    Movie.supportingActor,
-    Movie.supportingActorCharacter,
-    Movie.director,
-    Games.publisher,
+    Movies.rating,
+    Movies.leadActor,
+    Movies.leadActorCharacter,
+    Movies.supportingActor,
+    Movies.supportingActorCharacter,
+    Movies.director,
+    Games.publisher AS gamePublisher,
     Games.platform,
     Games.metacritic,
     Games.esrbRating,
     Tv.[language],
-    Tv.rating,
+    Tv.rating AS TvRating,
     Tv.numberOfEpisodes,
     Tv.numberOfSeasons,
     Tv.[status],
@@ -260,11 +262,11 @@ SELECT
     Books.page_count,
     Books.isbn
 FROM Media
-JOIN Books ON Books.mediaId = Media.mediaId
-JOIN Music ON Music.mediaId = Media.mediaId
-JOIN Tv ON Tv.mediaId = Media.mediaId
-JOIN Games ON Games.mediaId = Media.mediaId
-JOIN Movies ON Media.mediaId = Movies.mediaId
+LEFT JOIN Books ON Books.mediaId = Media.mediaId
+LEFT JOIN Music ON Music.mediaId = Media.mediaId
+LEFT JOIN Tv ON Tv.mediaId = Media.mediaId
+LEFT JOIN Games ON Games.mediaId = Media.mediaId
+LEFT JOIN Movies ON Media.mediaId = Movies.mediaId
 GO
 
 -- Shows user reviews grouped by user
@@ -274,7 +276,7 @@ SELECT
     [user].email,
     [user].firstName,
     [user].lastName,
-    Review.mediaId,
+    Review_for.mediaId,
     Review.rating,
     Review.reviewTitle,
     Review.reviewText,
@@ -282,7 +284,6 @@ SELECT
 FROM [user]
 JOIN Review_for ON [user].id = Review_for.userId
 JOIN Review ON Review_for.reviewId = Review.reviewId
-GROUP BY [user].id
 GO
 
 -- Shows user collections grouped by user
@@ -292,12 +293,13 @@ SELECT
     [user].firstName,
     [user].lastName,
     [User_Creates_Collection].dateCreated,
-    [Collection_tag].tag,
+    [Collection_tags].tag,
     [Collection].collectionName,
     [Collection].collectionDesc
 FROM[user]
-JOIN [User_Creates_Collection] ON [User_Creates_Collection].userId = [user].id
-JOIN [Collection] ON [Collection].collectionId = [User_Creates_Collection].collectionId
+LEFT JOIN [User_Creates_Collection] ON [User_Creates_Collection].userId = [user].id
+LEFT JOIN [Collection] ON [Collection].collectionId = [User_Creates_Collection].collectionId
+LEFT JOIN [Collection_tags] ON [Collection_tags].collectionId = [Collection].collectionId
 GO
 
 -- 4. Create 1 Trigger :- For your project create one Trigger associated with any type of action
