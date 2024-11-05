@@ -308,15 +308,20 @@ ON Review_for
 INSTEAD OF INSERT
 AS 
 BEGIN
-    DECLARE @id INT;
+    DECLARE @id INT, @mediaId int;
 
-    SELECT @id FROM [user];
+    SELECT @id = userId, @mediaId = mediaId FROM inserted;
 
     IF EXISTS(
-        SELECT 1 FROM [user] WHERE id = @id
+        SELECT 1 FROM Review_for WHERE id = @id AND @mediaId = mediaId
     )
     BEGIN
         RAISERROR('This user has already written a review', 16, 1);
+    END
+    ELSE
+    BEGIN
+	INSERT INTO Review_for (reviewId, userId, mediaId, reviewedAt)
+	SELECT reviewId, userId, mediaId, reviewedAt FROM inserted;
     END
 END;
 
@@ -324,6 +329,6 @@ END;
 
 CREATE NONCLUSTERED INDEX idx_MediaIdForReview on Review(mediaId);
 
-CREATE NONCLUSTERED INDEX idx_MediaIdForCollecion on [Collection_contains_Media](mediaId);
+CREATE NONCLUSTERED INDEX idx_MediaName on Media([name]);
 
 CREATE NONCLUSTERED INDEX idx_UsersCollections on [User_Creates_Collection](userId);
