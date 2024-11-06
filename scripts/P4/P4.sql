@@ -4,7 +4,7 @@ GO
 -- 5. Implement 1 Column Encryption :- For any 1 column in your table, implement the column
 -- encryption for security purposes
 -- Note: Modify passwordHash to VARBINARY(256) in [user] table
-
+-- We will encrypt the password column in the user table so passwords are not visible as plaintext
 -- Create Certificate and Symmetric Key
 CREATE MASTER KEY ENCRYPTION BY PASSWORD = 'Media_Organizer_App@2024!';
 
@@ -109,7 +109,7 @@ DECLARE @IsAuthenticated BIT;
 
 EXEC AuthenticateUser
     @email = 'jane.doe@email.com',
-    @password = '789',
+    @password = 'password789',
     @UserAuthenticated = @IsAuthenticated OUTPUT
 
 
@@ -222,115 +222,130 @@ CREATE FUNCTION dbo.getCollectionGenreCounts (
 GO
 
 SELECT * FROM dbo.getCollectionGenreCounts(3);
+GO
 
 -- 3. Create 3 views :- For your project create three views for any 3 tables
 
 -- Displays all media stored in our database with their unique properties
-
--- Displays all media stored in our database with their unique properties
-
+-- NULL values for the properties which do not apply to a media type
 CREATE VIEW vw_Media AS
-SELECT
-    Media.[name],
-    Media.overview,
-    Media.release_date,
-    Media.genre,
-    Media.[type],
-    Movies.rating,
-    Movies.leadActor,
-    Movies.leadActorCharacter,
-    Movies.supportingActor,
-    Movies.supportingActorCharacter,
-    Movies.director,
-    Games.publisher AS gamePublisher,
-    Games.platform,
-    Games.metacritic,
-    Games.esrbRating,
-    Tv.[language],
-    Tv.rating AS TvRating,
-    Tv.numberOfEpisodes,
-    Tv.numberOfSeasons,
-    Tv.[status],
-    Tv.network,
-    Music.artist,
-    Music.songDuration,
-    Music.producer,
-    Music.recordLabel,
-    Books.publisher,
-    Books.author,
-    Books.maturity_rating,
-    Books.page_count,
-    Books.isbn
-FROM Media
-LEFT JOIN Books ON Books.mediaId = Media.mediaId
-LEFT JOIN Music ON Music.mediaId = Media.mediaId
-LEFT JOIN Tv ON Tv.mediaId = Media.mediaId
-LEFT JOIN Games ON Games.mediaId = Media.mediaId
-LEFT JOIN Movies ON Media.mediaId = Movies.mediaId
+    SELECT
+        Media.[name],
+        Media.overview,
+        Media.release_date,
+        Media.genre,
+        Media.[type],
+        Movies.rating AS movieRaing,
+        Movies.leadActor,
+        Movies.leadActorCharacter,
+        Movies.supportingActor,
+        Movies.supportingActorCharacter,
+        Movies.director,
+        Games.publisher AS gamePublisher,
+        Games.platform,
+        Games.metacritic,
+        Games.esrbRating,
+        Tv.[language],
+        Tv.rating AS tvRating,
+        Tv.numberOfEpisodes,
+        Tv.numberOfSeasons,
+        Tv.[status],
+        Tv.network,
+        Music.artist,
+        Music.songDuration,
+        Music.producer,
+        Music.recordLabel,
+        Books.publisher AS bookPublisher,
+        Books.author,
+        Books.maturity_rating,
+        Books.page_count,
+        Books.isbn
+    FROM Media
+    LEFT JOIN Books ON Books.mediaId = Media.mediaId
+    LEFT JOIN Music ON Music.mediaId = Media.mediaId
+    LEFT JOIN Tv ON Tv.mediaId = Media.mediaId
+    LEFT JOIN Games ON Games.mediaId = Media.mediaId
+    LEFT JOIN Movies ON Media.mediaId = Movies.mediaId;
+GO
+
+SELECT * FROM vw_Media;
 GO
 
 -- Shows user reviews grouped by user
-
 CREATE VIEW vw_UserReviews AS
-SELECT
-    [user].email,
-    [user].firstName,
-    [user].lastName,
-    Review_for.mediaId,
-    Review.rating,
-    Review.reviewTitle,
-    Review.reviewText,
-    Review_for.reviewedAt
-FROM [user]
-JOIN Review_for ON [user].id = Review_for.userId
-JOIN Review ON Review_for.reviewId = Review.reviewId
+    SELECT
+        [user].email,
+        [user].firstName,
+        [user].lastName,
+        Review_for.mediaId,
+        Review.rating,
+        Review.reviewTitle,
+        Review.reviewText,
+        Review_for.reviewedAt
+    FROM [user]
+    JOIN Review_for ON [user].id = Review_for.userId
+    JOIN Review ON Review_for.reviewId = Review.reviewId;
+GO
+
+SELECT * FROM vw_UserReviews;
 GO
 
 -- Shows user collections grouped by user
 CREATE VIEW vw_UserCollections AS
-SELECT
-    [user].email,
-    [user].firstName,
-    [user].lastName,
-    [User_Creates_Collection].dateCreated,
-    [Collection_tags].tag,
-    [Collection].collectionName,
-    [Collection].collectionDesc
-FROM[user]
-LEFT JOIN [User_Creates_Collection] ON [User_Creates_Collection].userId = [user].id
-LEFT JOIN [Collection] ON [Collection].collectionId = [User_Creates_Collection].collectionId
-LEFT JOIN [Collection_tags] ON [Collection_tags].collectionId = [Collection].collectionId
+    SELECT
+        [user].email,
+        [user].firstName,
+        [user].lastName,
+        [User_Creates_Collection].dateCreated,
+        [Collection_tags].tag,
+        [Collection].collectionName,
+        [Collection].collectionDesc
+    FROM[user]
+    LEFT JOIN [User_Creates_Collection] ON [User_Creates_Collection].userId = [user].id
+    LEFT JOIN [Collection] ON [Collection].collectionId = [User_Creates_Collection].collectionId
+    LEFT JOIN [Collection_tags] ON [Collection_tags].collectionId = [Collection].collectionId;
+GO
+
+SELECT * FROM vw_UserCollections;
 GO
 
 -- 4. Create 1 Trigger :- For your project create one Trigger associated with any type of action
 -- between the referenced tables(primary-foreign key relationship tables)
 
-CREATE TRIGGER trg_UserActionHistory
-ON Review_for
-INSTEAD OF INSERT
-AS 
-BEGIN
-    DECLARE @id INT, @mediaId int;
-
-    SELECT @id = userId, @mediaId = mediaId FROM inserted;
-
-    IF EXISTS(
-        SELECT 1 FROM Review_for WHERE id = @id AND @mediaId = mediaId
-    )
+-- This trigger ensures that when a new review is added to the database
+-- the same user is not allowed to review the same media item more 
+-- than one time.
+CREATE TRIGGER trg_UserSingleReview
+    ON Review_for
+    INSTEAD OF INSERT
+    AS 
     BEGIN
-        RAISERROR('This user has already written a review', 16, 1);
-    END
-    ELSE
-    BEGIN
-	INSERT INTO Review_for (reviewId, userId, mediaId, reviewedAt)
-	SELECT reviewId, userId, mediaId, reviewedAt FROM inserted;
-    END
-END;
+        DECLARE @userId INT, @mediaId INT, @reviewId INT;
+
+        SELECT @userId = userId, @mediaId = mediaId, @reviewId = reviewId FROM inserted;
+
+        IF EXISTS(
+            SELECT 1 FROM Review_for WHERE userId = @userId AND mediaId = @mediaId
+        )
+        BEGIN
+            RAISERROR('This user has already written a review for this media', 16, 1);
+            DELETE FROM Review WHERE reviewId = @reviewId;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO Review_for (reviewId, userId, mediaId, reviewedAt)
+            SELECT reviewId, userId, mediaId, reviewedAt FROM inserted;
+        END
+    END;
+GO
 
 -- 6. Create 3 non-clustered indexes :- create 3 non-clustered indexes on your tables.
 
-CREATE NONCLUSTERED INDEX idx_MediaIdForReview on Review(mediaId);
-
+-- This index will allow fast lookup of media by name
 CREATE NONCLUSTERED INDEX idx_MediaName on Media([name]);
 
+-- This index will allow quick lookup of all the review for a particular media
+CREATE NONCLUSTERED INDEX idx_MediaIdForReview on Review_for(mediaId);
+
+-- This index will allow fast lookup of all the collections a particular user has created
 CREATE NONCLUSTERED INDEX idx_UsersCollections on [User_Creates_Collection](userId);
