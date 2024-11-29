@@ -420,3 +420,257 @@ app.delete('/tv/:id', async (request, response) => {
 
 //////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////// USER //////////////////////////////////////////
+
+// GET
+
+app.get('/user/:id', async (request, response) => {
+    const userID = request.params.id;
+    try {
+        const result = await queryDatabase(`
+            OPEN SYMMETRIC KEY UserKey DECRYPTION BY CERTIFICATE UserCert;
+            SELECT u.id, u.email, CONVERT(VARCHAR(256), DecryptByKey(u.passwordHash)) AS [password], u.firstName, u.lastName
+            FROM [user] u
+            WHERE u.id = ${userID};
+            CLOSE SYMMETRIC KEY UserKey;
+        `);
+        if (result.recordset.length === 0) {
+            return response.status(404).send({ message: "User was not found" });
+        }
+        response.send(result.recordset[0]);
+    } catch (error) {
+        await transaction.rollback();
+        response.status(500).send({ error: "Error retrieving User Information", details: error.message });
+    }
+});
+
+// POST
+
+app.post('/user', async (request, response) => {
+    const {email, passwordHash, firstName, lastName} = request.body;
+
+    if (!email || !passwordHash || !firstName || !lastName) {
+        return response.status(400).send({ message: "Invalid request. Missing required fields." });
+    }
+
+    const pool = await sql.connect(DATABASE_CONNECTION_STRING);
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        await transaction.begin();
+        await transaction.request()
+            .query(`
+                OPEN SYMMETRIC KEY UserKey DECRYPTION BY CERTIFICATE UserCert;
+            `);
+        await transaction.request()
+            .query(`
+                INSERT INTO [user] (email, passwordHash, firstName, lastName)
+                VALUES ('${email}', EncryptByKey(Key_GUID('UserKey'), '${passwordHash}'), '${firstName}', '${lastName}');
+            `);
+        await transaction.request()
+            .query(`
+                CLOSE SYMMETRIC KEY UserKey;
+                `);
+        await transaction.commit();
+        response.status(201).send({ message: "User account added successfully" });
+    } catch (error) {
+        await transaction.rollback();
+        response.status(500).send({ error: "Error adding user account", details: error.message });
+    }
+});
+
+// PUT
+
+app.put('/user/:id', async (request, response) => {
+    const userID = request.params.id;
+    const {email, passwordHash, firstName, lastName} = request.body;
+
+    const pool = await sql.connect(DATABASE_CONNECTION_STRING);
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        await transaction.begin();
+
+        // Update User Table
+        const userFields = [];
+        if (email) userFields.push(`email = '${email}'`);
+        if (passwordHash) userFields.push(`passwordHash = EncryptByKey(Key_GUID('UserKey'),'${passwordHash}')`);
+        if (firstName) userFields.push(`firstName = '${firstName}'`);
+        if (lastName) userFields.push(`lastName = '${lastName}'`);
+
+        if (userFields.length > 0) {
+            const userQuery = `
+                UPDATE [user]
+                SET ${userFields.join(', ')}
+                WHERE id = ${userID};
+            `;
+            await transaction.request()
+            .query(`
+                OPEN SYMMETRIC KEY UserKey DECRYPTION BY CERTIFICATE UserCert;
+            `);
+            
+            await transaction.request().query(userQuery);
+
+            await transaction.request()
+            .query(`
+                CLOSE SYMMETRIC KEY UserKey;
+                `);
+        }
+
+        await transaction.commit();
+        response.send({ message: "User account information updated successfully" });
+    } catch (error) {
+        await transaction.rollback();
+        response.status(500).send({ error: "Error updating user account", details: error.message });
+    }
+});
+
+// DELETE
+
+app.delete('/user/:id', async (request, response) => {
+    const userID = request.params.id;
+    const pool = await sql.connect(DATABASE_CONNECTION_STRING);
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        await transaction.begin();
+
+        await transaction.request()
+            .query(`DELETE FROM [user] WHERE id = ${userID};`);
+
+        await transaction.commit();
+        response.send({ message: "User account deleted successfully" });
+    } catch (error) {
+        await transaction.rollback();
+        response.status(500).send({ error: "Error deleting user account", details: error.message });
+    }
+});
+
+//////////////////////////////////////////////////////////////////////////////
+
+///////////////////////////// Music //////////////////////////////////////////
+
+// GET
+app.get('/music/:id', async (request, response) => {
+    const gameId = request.params.id;
+    try {
+        const result = await queryDatabase(`
+            SELECT m.*, g.*
+            FROM Media m
+            JOIN Music g ON m.mediaId = g.mediaId
+            WHERE m.mediaId = ${gameId};
+        `);
+        if (result.recordset.length === 0) {
+            return response.status(404).send({ message: "Music not found" });
+        }
+        response.send(result.recordset[0]);
+    } catch (error) {
+        response.status(500).send({ error: "Error retrieving music", details: error.message  });
+    }
+});
+
+// POST
+app.post('/music', async (request, response) => {
+    const { mediaId, name, overview, poster_path, release_date, genre, type, artist, songDuration, producer, recordLabel } = request.body;
+    if (!mediaId || !name || !overview || !poster_path || !release_date || !genre || !type || !artist || !songDuration || !producer || !recordLabel) {
+        return response.status(400).send({ message: "Invalid request. Missing required fields." });
+    }
+    if (type !== 'MUSIC') return response.status(400).send({ message: "Invalid type, must be 'MUSIC'" });
+
+    const pool = await sql.connect(DATABASE_CONNECTION_STRING);
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+        await transaction.request()
+            .query(`
+                INSERT INTO Media (mediaId, name, overview, poster_path, release_date, genre, type)
+                VALUES (${mediaId}, '${name}', '${overview}', '${poster_path}', '${release_date}', '${genre}', '${type}');
+            `);
+        await transaction.request()
+            .query(`
+                INSERT INTO Music (mediaId, artist, songDuration, producer, recordLabel)
+                VALUES (${mediaId}, '${artist}', '${songDuration}', '${producer}', '${recordLabel}');
+            `);
+        await transaction.commit();
+        response.status(201).send({ message: "Music added successfully" });
+    } catch (error) {
+        await transaction.rollback();
+        response.status(500).send({ error: "Error adding music", details: error.message });
+    }
+});
+
+// PUT
+app.put('/music/:id', async (request, response) => {
+    const musicID = request.params.id;
+    const { name, overview, poster_path, release_date, genre, artist, songDuration, producer, recordLabel } = request.body;
+
+    const pool = await sql.connect(DATABASE_CONNECTION_STRING);
+    const transaction = new sql.Transaction(pool);
+
+    try {
+        await transaction.begin();
+
+        // Update Media Table
+        const mediaFields = [];
+        if (name) mediaFields.push(`name = '${name}'`);
+        if (overview) mediaFields.push(`overview = '${overview}'`);
+        if (poster_path) mediaFields.push(`poster_path = '${poster_path}'`);
+        if (release_date) mediaFields.push(`release_date = '${release_date}'`);
+        if (genre) mediaFields.push(`genre = '${genre}'`);
+
+        if (mediaFields.length > 0) {
+            const mediaQuery = `
+                UPDATE Media
+                SET ${mediaFields.join(', ')}
+                WHERE mediaId = ${musicID};
+            `;
+            await transaction.request().query(mediaQuery);
+        }
+
+        // Update Music Table
+        const musicFields = [];
+        if (artist) musicFields.push(`artist = '${artist}'`);
+        if (songDuration) musicFields.push(`songDuration = '${songDuration}'`);
+        if (producer) musicFields.push(`producer = '${producer}'`);
+        if (recordLabel) musicFields.push(`recordLabel = '${recordLabel}'`);
+
+        if (musicFields.length > 0) {
+            const musicQuery = `
+                UPDATE Music
+                SET ${musicFields.join(', ')}
+                WHERE mediaId = ${musicID};
+            `;
+            await transaction.request().query(musicQuery);
+        }
+
+        await transaction.commit();
+        response.send({ message: "Music updated successfully" });
+    } catch (error) {
+        await transaction.rollback();
+        response.status(500).send({ error: "Error updating music", details: error.message });
+    }
+});
+
+// DELETE
+app.delete('/music/:id', async (request, response) => {
+    const musicID = request.params.id;
+    const pool = await sql.connect(DATABASE_CONNECTION_STRING);
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+
+        await transaction.request()
+            .query(`DELETE FROM Music WHERE mediaId = ${musicID};`);
+
+        await transaction.request()
+            .query(`DELETE FROM Media WHERE mediaId = ${musicID};`);
+
+        await transaction.commit();
+        response.send({ message: "Music deleted successfully" });
+    } catch (error) {
+        await transaction.rollback();
+        response.status(500).send({ error: "Error deleting music", details: error.message  });
+    }
+});
+
+//////////////////////////////////////////////////////////////////////////////
