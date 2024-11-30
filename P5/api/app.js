@@ -552,13 +552,13 @@ app.delete('/user/:id', async (request, response) => {
 
 // GET
 app.get('/music/:id', async (request, response) => {
-    const gameId = request.params.id;
+    const musicID = request.params.id;
     try {
         const result = await queryDatabase(`
             SELECT m.*, g.*
             FROM Media m
             JOIN Music g ON m.mediaId = g.mediaId
-            WHERE m.mediaId = ${gameId};
+            WHERE m.mediaId = ${musicID};
         `);
         if (result.recordset.length === 0) {
             return response.status(404).send({ message: "Music not found" });
